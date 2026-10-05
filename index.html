@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Cube</title>
+
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #002FFF;
+            width: 100vw;
+            height: 100vh;
+            font-family: sans-serif;
+        }
+
+        #webglCanvas {
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #canvas2d {
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        #header {
+        position: fixed;
+        top: 15px;
+        left: 20px;
+        right: 20px;
+
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+
+        color: white;
+        font-size: 20px;
+
+        z-index: 100;
+        }
+
+        #musicControls {
+            display: flex;
+            gap: 45px;
+        }
+
+        #playButton,
+        #stopButton {
+            cursor: pointer;
+        }
+
+    </style>
+</head>
+
+<body>
+
+    <canvas id="webglCanvas"></canvas>
+    <canvas id="canvas2d"></canvas>
+
+    <audio id="fireworkSound" src="bubblepop.mp3"></audio>
+
+    <div id="header">
+    <div id="siteTitle">click, drag, scroll the page.</div>
+
+    <div id="musicControls">
+        <span id="playButton">Play</span>
+        <span id="stopButton">Stop</span>
+    </div>
+    </div>
+
+
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+
+    <script>
+        // 3D 설정
+        const webglCanvas = document.querySelector('#webglCanvas');
+
+        const scene = new THREE.Scene();
+
+        scene.background = new THREE.Color(0x002FFF);
+
+
+        const camera = new THREE.PerspectiveCamera(
+            75,
+            window.innerWidth / window.innerHeight,
+            0.1,
+            1000
+        );
+
+        camera.position.set(0, 1.3, 0.2);
+
+
+        const renderer = new THREE.WebGLRenderer({
+            canvas: webglCanvas,
+            antialias: true
+        });
+
+        renderer.setSize(
+            window.innerWidth,
+            window.innerHeight
+        );
+
+        renderer.setPixelRatio(
+            window.devicePixelRatio
+        );
+
+        // 메인 큐브
+
+        const mainGeometry = new THREE.BoxGeometry(
+            2,2,2,10,10,10);
+
+
+        const mainMaterial = new THREE.PointsMaterial({
+            size: 0.06,
+            color: 0x00ffcc,
+            transparent: true,
+            opacity: 0.8
+        });
+
+
+        const mainCube = new THREE.Points(
+            mainGeometry,
+            mainMaterial
+        );
+
+        scene.add(mainCube);
+
+        // 마우스 컨트롤
+
+        const controls = new THREE.OrbitControls(
+            camera,
+            renderer.domElement
+        );
+
+        controls.enableDamping = true;
+
+        let isPlaying = true;
+        let rotationSpeed = 1;
+
+        const playButton = document.querySelector('#playButton');
+        const stopButton = document.querySelector('#stopButton');
+
+        playButton.addEventListener('click', () => {
+            isPlaying = true;
+        });
+
+        stopButton.addEventListener('click', () => {
+            isPlaying = false;
+        });
+
+        // 2D 캔버스
+
+        const canvas2d = document.querySelector('#canvas2d');
+
+        const ctx = canvas2d.getContext('2d');
+
+
+        function resize2dCanvas() {
+
+            canvas2d.width = window.innerWidth;
+            canvas2d.height = window.innerHeight;
+
+        }
+
+
+        window.addEventListener(
+            'resize',
+            resize2dCanvas
+        );
+
+        resize2dCanvas();
+
+
+        // 파티클 배열
+
+        const particles2d = [];
+        const mouseParticles = [];
+
+
+        // 클릭 → 폭죽
+
+        window.addEventListener('click', (event) => {
+        createFirework(event.clientX, event.clientY);
+
+        const sound = document.querySelector('#fireworkSound');
+        sound.play();
+    });
+
+
+        function createFirework(x, y) {
+            const particleCount = 200;
+
+            for (
+                let i = 0;
+                i < particleCount;
+                i++
+            ) {
+
+                const angle =
+                    Math.random() *
+                    Math.PI *
+                    2;
+
+
+                const speed =
+                    Math.random() *
+                    4 + 2;
+
+
+                particles2d.push({
+
+                    x: x,
+                    y: y,
+
+                    velocityX:
+                        Math.cos(angle) *
+                        speed,
+
+                    velocityY:
+                        Math.sin(angle) *
+                        speed,
+
+                    gravity: 0.04,
+
+                    alpha: 1,
+
+                    size:
+                        Math.random() *
+                        3 + 2,
+
+                    color:
+                        `hsl(${Math.random() * 360}, 90%, 65%)`
+
+                });
+
+            }
+
+        }
+
+
+        // 마우스 이동 → 파티클 트레일
+
+       window.addEventListener(
+        'pointermove',
+        (event) => {
+
+        mouseParticles.push({
+
+            x: event.clientX,
+            y: event.clientY,
+
+            alpha: 1,
+
+            size:
+                Math.random() *
+                6 + 5,
+
+            color:
+                `hsl(${Math.random() * 360}, 90%, 70%)`
+
+                });
+
+            }
+        );
+
+        // 애니메이션
+
+        function animate() {
+
+            requestAnimationFrame(animate);
+
+
+            // 3D 큐브 회전
+            
+            if (isPlaying) {
+                rotationSpeed += 0.02;
+
+                if (rotationSpeed > 1) {
+                    rotationSpeed = 1;
+                }
+            } else {
+                rotationSpeed *= 0.6;
+            }
+
+            mainCube.rotation.x += 0.002 * rotationSpeed;
+            mainCube.rotation.y += 0.004 * rotationSpeed;
+            
+            controls.update();
+
+            renderer.render(
+                scene,
+                camera
+            );
+
+
+            // 2D 캔버스 초기화
+
+            ctx.clearRect(
+                0,
+                0,
+                canvas2d.width,
+                canvas2d.height
+            );
+
+
+            // 폭죽 파티클
+
+            for (
+                let i = particles2d.length - 1;
+                i >= 0;
+                i--
+            ) {
+
+                const p = particles2d[i];
+
+
+                // 이동
+
+                p.x += p.velocityX;
+
+                p.y += p.velocityY;
+
+
+                // 중력
+
+                p.velocityY += p.gravity;
+
+
+                // 속도 감소
+
+                p.velocityX *= 0.98;
+
+                p.velocityY *= 0.98;
+
+
+                // 투명도
+
+                p.alpha -= 0.012;
+
+
+                // 제거
+
+                if (p.alpha <= 0) {
+
+                    particles2d.splice(i, 1);
+
+                    continue;
+
+                }
+
+
+                // 그리기
+
+                ctx.save();
+
+                ctx.globalAlpha =
+                    p.alpha;
+
+                ctx.fillStyle =
+                    p.color;
+
+
+                ctx.beginPath();
+
+                ctx.arc(
+                    p.x,
+                    p.y,
+                    p.size,
+                    0,
+                    Math.PI * 2
+                );
+
+                ctx.fill();
+
+                ctx.restore();
+
+            }
+
+
+            // 마우스 트레일
+
+            for (
+                let i = mouseParticles.length - 1;
+                i >= 0;
+                i--
+            ) {
+
+                const p =
+                    mouseParticles[i];
+
+
+                // 천천히 사라짐
+
+                p.alpha -= 0.025;
+
+
+                // 제거
+
+                if (p.alpha <= 0) {
+
+                    mouseParticles.splice(
+                        i,
+                        1
+                    );
+
+                    continue;
+
+                }
+
+
+                // 파티클 그리기
+
+                ctx.save();
+
+                ctx.globalAlpha =
+                    p.alpha;
+
+                ctx.fillStyle =
+                    p.color;
+
+
+                ctx.beginPath();
+
+                ctx.arc(
+                    p.x,
+                    p.y,
+                    p.size,
+                    0,
+                    Math.PI * 2
+                );
+
+                ctx.fill();
+
+                ctx.restore();
+
+            }
+
+        }
+
+
+        animate();
+
+    </script>
+
+</body>
+</html>
